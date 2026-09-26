@@ -1,0 +1,41 @@
+name: Refresh trade data
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-trade-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Rebuild data/trade-data.json
+        run: python scripts/build_data.py --out data/trade-data.json
+
+      - name: Commit if the data changed
+        run: |
+          git config user.name "trade-data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git diff --quiet -- data/trade-data.json; then
+            echo "No change in trade data, nothing to commit."
+          else
+            git add data/trade-data.json
+            git commit -m "Refresh trade data ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi
